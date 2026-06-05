@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, TrendingUp, BarChart2, MessageSquare, User, HelpCircle, Moon, LogOut, ChevronUp, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, TrendingUp, BarChart2, MessageSquare, User, HelpCircle, Moon, LogOut, ChevronUp, ChevronDown, Menu } from 'lucide-react'
 
 const NAV_ITEMS = [
   { href: '/',            label: 'Dashboard',   icon: LayoutDashboard },
@@ -175,7 +175,7 @@ export default function Sidebar() {
         className="md:hidden fixed top-3 left-3 z-50 bg-zinc-900 text-white p-2 rounded-md shadow-lg"
         aria-label="Open menu"
       >
-        =
+        <Menu size={18} />
       </button>
 
       {/* Mobile overlay */}
