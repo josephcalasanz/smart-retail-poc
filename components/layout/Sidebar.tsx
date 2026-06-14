@@ -1,12 +1,22 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, TrendingUp, BarChart2, MessageSquare, User, HelpCircle, Moon, LogOut, ChevronUp, ChevronDown, Menu } from 'lucide-react'
+import { LayoutDashboard, TrendingUp, BarChart2, MessageSquare, User, HelpCircle, Moon, LogOut, ChevronUp, ChevronDown, ChevronRight, Menu, Gauge, Users, Store } from 'lucide-react'
+const DASHBOARD = {
+  href: '/dashboard',
+  label: 'Dashboard',
+  icon: Gauge,
+  children: [
+    { href: '/dashboard/management', label: 'Management', icon: Users },
+    { href: '/dashboard/store',      label: 'Store',      icon: Store },
+  ],
+}
 
 const NAV_ITEMS = [
-  { href: '/',            label: 'Dashboard',   icon: LayoutDashboard },
+  { href: '/products',    label: 'Products',    icon: LayoutDashboard },
   { href: '/forecasting', label: 'Forecasting', icon: TrendingUp      },
   { href: '/allocation',  label: 'Allocation',  icon: BarChart2       },
   { href: '/assistant',   label: 'Assistant',   icon: MessageSquare   },
@@ -24,17 +34,22 @@ export default function Sidebar() {
   const [open, setOpen]         = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const [dashOpen, setDashOpen] = useState(pathname.startsWith('/dashboard/'))
 
   const NavContent = () => (
     <>
       {/* Header */}
-      <div
-        className="px-5 py-5 border-b border-[#1f4027] flex items-center justify-between"
-        style={{ background: 'linear-gradient(160deg, #0d3318 0%, #1a7a2e 100%)' }}
-      >
+      <div className="px-5 py-4 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between">
         <div>
-          <div className="text-white font-bold text-sm tracking-widest uppercase">SMART</div>
-          <div className="mt-1.5 inline-block bg-[#8dc63f]/20 border border-[#8dc63f]/35
+          <Image
+            src="/smart-logo.png"
+            alt="Smart"
+            width={700}
+            height={201}
+            priority
+            className="h-7 w-auto"
+          />
+          <div className="mt-2 inline-block bg-[#8dc63f]/20 border border-[#8dc63f]/35
                           text-[#8dc63f] text-[8px] font-bold tracking-widest uppercase
                           px-2 py-0.5 rounded">
             Retail Intelligence
@@ -50,7 +65,60 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
+{/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {/* Dashboard group — label navigates, chevron toggles children */}
+        <div>
+          <div
+            className={`flex items-center rounded-md text-sm transition-colors border-l-[2.5px]
+              ${pathname === DASHBOARD.href
+                ? 'bg-[#1a7a2e]/13 text-white font-semibold border-[#5ab22e]'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800 border-transparent'
+              }`}
+          >
+            <Link
+              href={DASHBOARD.href}
+              onClick={() => setOpen(false)}
+              className={`flex-1 flex items-center gap-3 py-2.5 ${pathname === DASHBOARD.href ? 'pl-[9.5px]' : 'pl-3'}`}
+            >
+              <DASHBOARD.icon size={16} className={pathname === DASHBOARD.href ? 'text-[#5ab22e]' : 'text-zinc-600'} strokeWidth={2} />
+              {DASHBOARD.label}
+            </Link>
+            <button
+              onClick={() => setDashOpen((o) => !o)}
+              className="self-stretch px-2.5 flex items-center text-zinc-500 hover:text-white"
+              aria-label="Toggle dashboard menu"
+              aria-expanded={dashOpen}
+            >
+              <ChevronRight size={13} className={`transition-transform ${dashOpen ? 'rotate-90' : ''}`} />
+            </button>
+          </div>
+
+          {dashOpen && (
+            <div className="ml-[21px] pl-3 border-l border-zinc-800 mt-0.5 space-y-0.5">
+              {DASHBOARD.children.map((child) => {
+                const cactive = pathname === child.href
+                const CIcon = child.icon
+                return (
+                  <Link
+                    key={child.href}
+                    href={child.href}
+                    onClick={() => setOpen(false)}
+                    className={`flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] transition-colors
+                      ${cactive
+                        ? 'bg-[#1a7a2e]/18 text-white font-semibold'
+                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                      }`}
+                  >
+                    <CIcon size={14} className={cactive ? 'text-[#5ab22e]' : 'text-zinc-600'} strokeWidth={2} />
+                    {child.label}
+                  </Link>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href
           const Icon   = item.icon
