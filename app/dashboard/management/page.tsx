@@ -1,0 +1,294 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
+import Header from '@/components/layout/Header'
+import {
+  demandSeries, salesSeries, mgmtStores, aging, stockouts, kpis,
+} from '@/lib/managementData'
+
+/* Reveal-on-scroll hook */
+function useInView<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [inView, setInView] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setInView(true)
+          obs.unobserve(el)
+        }
+      },
+      { threshold: 0.25 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+  return [ref, inView] as const
+}
+
+const GROW = 'cubic-bezier(0.4, 0, 0.2, 1)'
+
+function heatColor(t: number) {
+  const a = [234, 245, 236]
+  const b = [26, 122, 46]
+  const c = a.map((v, i) => Math.round(v + (b[i] - v) * t))
+  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`
+}
+
+const tooltipStyle = {
+  contentStyle: {
+    borderRadius: 8,
+    border: '1px solid #e4e4e7',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.1)',
+    fontSize: 11,
+  },
+  labelStyle: { fontWeight: 700, color: '#27272a', fontSize: 10 },
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-xs font-bold tracking-wide uppercase text-zinc-400 mb-3">
+      {children}
+    </h2>
+  )
+}
+
+function Card({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="bg-white border border-zinc-200 rounded-xl p-4">
+      <div className="text-xs font-bold text-zinc-700 mb-3">{title}</div>
+      {children}
+    </div>
+  )
+}
+
+export default function ManagementPage() {
+  const [invRef, invInView] = useInView<HTMLDivElement>()
+
+  const heatVals = mgmtStores.flatMap((s) => [s.iphone, s.galaxy])
+  const vMin = Math.min(...heatVals)
+  const vMax = Math.max(...heatVals)
+  const maxCover = Math.max(...mgmtStores.map((s) => s.daysCover))
+  const maxValue = Math.max(...mgmtStores.map((s) => s.invValue))
+
+  const THRESHOLD = 14 // "healthy" days-of-cover cutoff
+  const threshPct = (THRESHOLD / maxCover) * 100
+
+  // donut geometry for Inventory Aging
+  const R = 38
+  const CIRC = 2 * Math.PI * R
+  const GAP = 3
+  let cum = 0
+  const arcs = aging.map((a) => {
+    const seg = (a.pct / 100) * CIRC - GAP
+    const offset = -(cum / 100) * CIRC
+    cum += a.pct
+    return { ...a, seg, offset }
+  })
+  
+
+  return (
+    <>
+      <Header title="Management" />
+      <div className="px-4 md:px-8 py-6 space-y-8">
+
+        {/* Executive KPIs */}
+        <section>
+          <SectionLabel>Executive KPIs</SectionLabel>
+          <div className="flex gap-3 flex-wrap">
+            {kpis.map((k) => (
+              <div key={k.label} className="flex-1 min-w-[150px] bg-white border border-zinc-200 rounded-xl px-4 py-3.5">
+                <div className="text-[9.5px] uppercase tracking-wide text-zinc-400">{k.label}</div>
+                <div className="text-2xl font-extrabold text-zinc-900 mt-0.5">{k.value}</div>
+                <div className="text-[10.5px] font-semibold mt-0.5" style={{ color: k.color }}>{k.delta}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Demand Forecast */}
+        <section>
+          <SectionLabel>Demand Forecast</SectionLabel>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+            <Card title="Forecast vs Actual">
+              <ResponsiveContainer width="100%" height={150}>
+                <LineChart data={demandSeries} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={46} />
+                  <Tooltip {...tooltipStyle} />
+                  <Line name="Forecast" type="monotone" dataKey="forecast" stroke="#a1a1aa" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
+                  <Line name="Actual" type="monotone" dataKey="actual" stroke="#1a7a2e" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+
+            <Card title="Sales Trend by SKU">
+              <ResponsiveContainer width="100%" height={150}>
+                <LineChart data={salesSeries} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={46} />
+                  <Tooltip {...tooltipStyle} />
+                  <Line name="iPhone 17 Pro" type="monotone" dataKey="iphone" stroke="#1a7a2e" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
+                  <Line name="Samsung S25 Ultra" type="monotone" dataKey="galaxy" stroke="#6ec6e6" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
+                </LineChart>
+              </ResponsiveContainer>
+            </Card>
+
+            <Card title="Store Demand Heatmap">
+              <div className="grid gap-1" style={{ gridTemplateColumns: '1fr auto auto' }}>
+                <div />
+                <div className="text-[8.5px] uppercase tracking-wide text-zinc-400 text-center px-1">iPhone</div>
+                <div className="text-[8.5px] uppercase tracking-wide text-zinc-400 text-center px-1">Samsung</div>
+                {mgmtStores.map((s) => {
+                  const tIp = (s.iphone - vMin) / (vMax - vMin)
+                  const tGa = (s.galaxy - vMin) / (vMax - vMin)
+                  const cell = (v: number, t: number) => (
+                    <div
+                      className="text-[11.5px] font-bold text-center rounded-md py-1.5 px-2 min-w-[44px]"
+                      style={{ background: heatColor(t), color: t > 0.55 ? '#fff' : '#1a7a2e' }}
+                    >
+                      {v}
+                    </div>
+                  )
+                  return (
+                    <div key={s.name} className="contents">
+                      <div className="text-[11px] text-zinc-600 self-center pr-2 whitespace-nowrap">{s.name}</div>
+                      {cell(s.iphone, tIp)}
+                      {cell(s.galaxy, tGa)}
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          </div>
+        </section>
+
+{/* Inventory Health — reveal on scroll */}
+        <section ref={invRef}>
+          <SectionLabel>Inventory Health</SectionLabel>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_1.1fr] gap-3.5">
+            <Card title={<>Days of Cover by Store <span className="font-normal text-[9px] text-zinc-400 ml-1">| {THRESHOLD}d healthy</span></>}>
+              {[...mgmtStores].sort((a, b) => a.daysCover - b.daysCover).map((s, i) => {
+                const col = s.daysCover < 7 ? '#ef4444' : s.daysCover < 14 ? '#f59e0b' : '#22c55e'
+                return (
+                  <div key={s.name} className="mb-2.5">
+                    <div className="flex justify-between text-[11px] mb-1">
+                      <span className="text-zinc-600">{s.name}</span>
+                      <span className="font-bold" style={{ color: col }}>{s.daysCover}d</span>
+                    </div>
+                    <div className="relative h-[7px] bg-zinc-100 rounded">
+                      <div
+                        className="h-full rounded"
+                        style={{
+                          width: invInView ? `${(s.daysCover / maxCover) * 100}%` : 0,
+                          background: col,
+                          transition: `width 0.9s ${GROW}`,
+                          transitionDelay: `${i * 0.08}s`,
+                        }}
+                      />
+                      <div
+                        className="absolute -top-[3px] -bottom-[3px] w-[1.5px] bg-zinc-400"
+                        style={{ left: `${threshPct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </Card>
+
+            <Card title="Inventory Aging">
+              <div className="text-[22px] font-extrabold leading-none" style={{ color: '#b45309' }}>11%</div>
+              <div className="text-[9px] uppercase tracking-wide text-zinc-400 mt-0.5">aged 60+ days</div>
+              <div className="h-px bg-zinc-100 my-3" />
+              <div className="flex items-center gap-4">
+                <svg
+                  viewBox="0 0 104 104" width="96" height="96"
+                  style={{ transform: 'rotate(-90deg)', flexShrink: 0, opacity: invInView ? 1 : 0, transition: 'opacity 0.7s ease' }}
+                >
+                  {arcs.map((a) => (
+                    <circle
+                      key={a.label} cx="52" cy="52" r={R} fill="none"
+                      stroke={a.color} strokeWidth="12"
+                      strokeDasharray={`${a.seg} ${CIRC - a.seg}`}
+                      strokeDashoffset={a.offset}
+                    />
+                  ))}
+                </svg>
+                <div className="flex-1 min-w-0">
+                  {aging.map((a) => (
+                    <div key={a.label} className="flex items-center gap-2 text-[11.5px] text-zinc-600 mb-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: a.color }} />
+                      <span className="flex-1">{a.label}</span>
+                      <span className="font-bold text-zinc-800">{a.pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Card>
+
+            <Card title="Inventory Value by Store (₱M)">
+              <div className="flex gap-1.5 items-end">
+                {mgmtStores.map((s, i) => (
+                  <div key={s.name} className="flex-1 flex flex-col items-center gap-1.5">
+                    <div className="text-[10px] font-bold text-zinc-800">{s.invValue}</div>
+                    <div className="w-[60%] h-[110px] flex items-end">
+                      <div
+                        className="w-full rounded-t"
+                        style={{
+                          height: `${(s.invValue / maxValue) * 100}%`,
+                          background: 'linear-gradient(180deg, #5ab22e, #1a7a2e)',
+                          transform: invInView ? 'scaleY(1)' : 'scaleY(0)',
+                          transformOrigin: 'bottom',
+                          transition: `transform 0.9s ${GROW}`,
+                          transitionDelay: `${i * 0.08}s`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="h-px bg-zinc-200" />
+              <div className="flex gap-1.5 mt-1">
+                {mgmtStores.map((s) => (
+                  <div key={s.name} className="flex-1 text-[8px] text-zinc-400 text-center leading-tight">
+                    {s.name.split(' ')[0]}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </section>
+
+        {/* Supply Risk */}
+        <section>
+          <SectionLabel>Supply Risk</SectionLabel>
+          <Card title="Stockout Risks">
+            {stockouts.map((s) => (
+              <div key={`${s.store}-${s.sku}`} className="flex items-center gap-3 py-2.5 border-t border-zinc-100 first:border-t-0">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-semibold text-zinc-800">{s.store} · {s.sku}</div>
+                  <div className="text-[11.5px] text-zinc-500">{s.days} days of cover remaining</div>
+                </div>
+                <span
+                  className="text-[10.5px] font-bold px-2.5 py-0.5 rounded-full"
+                  style={{ background: `${s.color}1a`, color: s.color }}
+                >
+                  {s.risk} risk
+                </span>
+              </div>
+            ))}
+          </Card>
+        </section>
+
+      </div>
+    </>
+  )
+}

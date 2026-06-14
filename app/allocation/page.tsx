@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Header from '@/components/layout/Header'
-import { STORES, SKUS } from '@/data/mock'
+import { STORES } from '@/data/mock'
 import { useProduct } from '@/context/ProductContext'
 import { Switch } from '@/components/ui/switch'
 
@@ -25,11 +25,9 @@ function getGapBadge(gap: number) {
   return             { label: 'Surplus',   class: 'bg-emerald-50 text-emerald-600 border-emerald-200' }
 }
 
-// Heat map helpers
-const MAX_GAP = 190
-
-function getHeatBg(gap: number): string {
-  const i = Math.min(Math.abs(gap) / MAX_GAP, 1)
+// Heat map helpers — maxGap is derived per product (passed in)
+function getHeatBg(gap: number, maxGap: number): string {
+  const i = Math.min(Math.abs(gap) / maxGap, 1)
   if (gap <= -100) return 'rgba(220,38,38,' + (0.08 + i * 0.14).toFixed(2) + ')'
   if (gap < 0)     return 'rgba(217,119,6,' + (0.06 + i * 0.10).toFixed(2) + ')'
   if (gap > 50)    return 'rgba(22,163,74,' + (0.06 + i * 0.12).toFixed(2) + ')'
@@ -44,8 +42,8 @@ function getHeatBarColor(gap: number): string {
   return 'transparent'
 }
 
-function getHeatBarWidth(gap: number): string {
-  return Math.min((Math.abs(gap) / MAX_GAP) * 100, 100) + '%'
+function getHeatBarWidth(gap: number, maxGap: number): string {
+  return Math.min((Math.abs(gap) / maxGap) * 100, 100) + '%'
 }
 
 function getHeatTextColor(gap: number): string {
@@ -62,37 +60,77 @@ function getRowTint(gap: number): string {
 }
 
 export default function AllocationPage() {
-  const { product } = useProduct()
-  const ALLOCATION_TABLE = product.allocation
-  const [rows, setRows]             = useState<AllocationRow[]>(product.allocation)
+  const { product, products, setProductId } = useProduct()
+
+  const [rows, setRows]             = useState<AllocationRow[]>(() => product.allocation.map(r => ({ ...r, rebalanced: false })))
   const [rebalanced, setRebalanced] = useState(false)
   const [showAiOnly, setShowAiOnly] = useState(false)
   const [selected, setSelected]     = useState<Set<string>>(new Set())
+  const [skuFilter, setSkuFilter]   = useState<string>('all')
+  const [sortDir, setSortDir]       = useState<'worst' | 'best'>('worst')
+  const [loading, setLoading]       = useState(true)
 
-  const displayRows = showAiOnly
-    ? rows.filter(r => r.recommended !== r.current)
-    : rows
+  // Reset + brief skeleton whenever the product changes (also fixes frozen-on-mount)
+  useEffect(() => {
+    setRows(product.allocation.map(r => ({ ...r, rebalanced: false })))
+    setSelected(new Set())
+    setRebalanced(false)
+    setShowAiOnly(false)
+    setSkuFilter('all')
+    setLoading(true)
+    const t = setTimeout(() => setLoading(false), 420)
+    return () => clearTimeout(t)
+  }, [product.id, product.allocation])
 
-  const displayKeys   = useMemo(() => displayRows.map(rowKey), [displayRows])
-  const allChecked    = displayKeys.length > 0 && displayKeys.every(k => selected.has(k))
-  const someChecked   = displayKeys.some(k => selected.has(k)) && !allChecked
-  const selectedCount = displayKeys.filter(k => selected.has(k)).length
+  // Product-derived heat scaling (was hardcoded 190)
+  const maxGap = useMemo(
+    () => Math.max(1, ...product.allocation.map(a => Math.abs(a.current - a.demand))),
+    [product.allocation]
+  )
+
+  // Filtered + severity-sorted rows for display
+  const displayRows = useMemo(() => {
+    return rows
+      .filter(r => (!showAiOnly || r.recommended !== r.current) && (skuFilter === 'all' || r.skuId === skuFilter))
+      .sort((a, b) => {
+        const ga = a.current - a.demand
+        const gb = b.current - b.demand
+        return sortDir === 'worst' ? ga - gb : gb - ga
+      })
+  }, [rows, showAiOnly, skuFilter, sortDir])
+
+  const selectableKeys = displayRows.filter(r => !r.rebalanced).map(rowKey)
+  const allChecked     = selectableKeys.length > 0 && selectableKeys.every(k => selected.has(k))
+  const someChecked    = selectableKeys.some(k => selected.has(k)) && !allChecked
+  const selectedCount  = displayRows.filter(r => selected.has(rowKey(r))).length
 
   function toggleSelectAll() {
     if (allChecked) {
-      setSelected(prev => { const next = new Set(prev); displayKeys.forEach(k => next.delete(k)); return next })
+      setSelected(prev => { const next = new Set(prev); selectableKeys.forEach(k => next.delete(k)); return next })
     } else {
-      setSelected(prev => { const next = new Set(prev); displayKeys.forEach(k => next.add(k)); return next })
+      setSelected(prev => { const next = new Set(prev); selectableKeys.forEach(k => next.add(k)); return next })
     }
   }
 
   function toggleRow(key: string) {
+    if (rebalanced) return
+    const r = rows.find(x => rowKey(x) === key)
+    if (r?.rebalanced) return
     setSelected(prev => { const next = new Set(prev); if (next.has(key)) { next.delete(key) } else { next.add(key) }; return next })
   }
 
-  const totalCurrentGap   = rows.reduce((sum, r) => sum + (r.demand - r.current), 0)
-  const totalRebalanceGap = rows.reduce((sum, r) => sum + (r.demand - r.recommended), 0)
-  const affectedRows      = rows.filter(r => r.recommended !== r.current).length
+  function toggleSort() {
+    setSortDir(prev => (prev === 'worst' ? 'best' : 'worst'))
+  }
+
+  // Live figures (current shifts toward recommended as rows rebalance)
+  const demandTot   = rows.reduce((s, r) => s + r.demand, 0)
+  const currentTot  = rows.reduce((s, r) => s + r.current, 0)
+  const recTot      = rows.reduce((s, r) => s + r.recommended, 0)
+  const liveGap     = demandTot - currentTot
+  const initialGap  = product.allocation.reduce((s, a) => s + (a.demand - a.current), 0)
+  const aiCount     = product.allocation.filter(a => a.recommended !== a.current).length
+  const gapImproved = rebalanced && liveGap < initialGap
 
   function handleRebalance() {
     setRows(prev => prev.map(r => {
@@ -104,18 +142,72 @@ export default function AllocationPage() {
   }
 
   function handleReset() {
-    setRows(ALLOCATION_TABLE)
+    setRows(product.allocation.map(r => ({ ...r, rebalanced: false })))
     setRebalanced(false)
     setSelected(new Set())
   }
 
   const applyDisabled = selectedCount === 0
 
+  // Reconciliation footnote: which SKUs' AI target runs ahead of committed
+  const recBySku: Record<string, number> = {}
+  product.allocation.forEach(a => { recBySku[a.skuId] = (recBySku[a.skuId] ?? 0) + a.recommended })
+  const overText = product.skus
+    .filter(s => recBySku[s.id] > (product.skuCommitted?.[s.id] ?? Infinity))
+    .map(s => `${s.color} (${recBySku[s.id].toLocaleString()} vs ${(product.skuCommitted?.[s.id] ?? 0).toLocaleString()} committed)`)
+    .join(', ')
+
+  const selectClass =
+    'appearance-none bg-white border border-zinc-200 rounded-lg pl-3.5 pr-8 py-2 text-sm font-bold text-zinc-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1a7a2e]/30'
+
   return (
     <div className="min-h-screen bg-zinc-50">
       <Header title="Allocation" />
       <div className="px-4 md:px-8 py-6 space-y-6">
 
+        {/* Selectors: Product + SKU */}
+        <div className="flex items-center gap-5 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm text-zinc-500">Product</span>
+            <div className="relative inline-flex items-center">
+              <select
+                value={product.id}
+                onChange={e => setProductId(e.target.value)}
+                className={selectClass}
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <svg className="pointer-events-none absolute right-2.5 w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-sm text-zinc-500">SKU</span>
+            <div className="relative inline-flex items-center">
+              <select
+                value={skuFilter}
+                onChange={e => setSkuFilter(e.target.value)}
+                className={selectClass}
+                style={{ fontFamily: 'Inter, sans-serif' }}
+              >
+                <option value="all">All SKUs</option>
+                {product.skus.map(s => <option key={s.id} value={s.id}>{s.color} {s.storage}</option>)}
+              </select>
+              <svg className="pointer-events-none absolute right-2.5 w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+            </div>
+          </div>
+        </div>
+
+        {loading ? (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[0, 1, 2, 3].map(i => <div key={i} className="h-[92px] bg-zinc-100 rounded-lg animate-pulse" />)}
+            </div>
+            <div className="h-12 bg-zinc-100 rounded-lg animate-pulse" />
+            <div className="h-[420px] bg-zinc-100 rounded-lg animate-pulse" />
+          </>
+        ) : (
+        <>
         {/* KPI cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white border border-zinc-200 rounded-lg px-3 md:px-5 py-3 md:py-4">
@@ -125,21 +217,21 @@ export default function AllocationPage() {
           </div>
           <div className="bg-white border border-zinc-200 rounded-lg px-3 md:px-5 py-3 md:py-4">
             <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">SKUs Tracked</div>
-            <div className="text-3xl font-bold text-zinc-800">{SKUS.length}</div>
+            <div className="text-3xl font-bold text-zinc-800">{product.skus.length}</div>
             <div className="text-xs text-zinc-400 mt-1">{product.name} variants</div>
           </div>
-          <div className={`border rounded-lg px-3 md:px-5 py-3 md:py-4 ${rebalanced ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-            <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Supply Gap</div>
-            <div className={`text-3xl font-bold ${rebalanced ? 'text-emerald-600' : 'text-red-600'}`}>
-              {rebalanced ? `+${Math.abs(totalRebalanceGap)}` : totalCurrentGap}
+          <div className={`border rounded-lg px-3 md:px-5 py-3 md:py-4 ${gapImproved ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Allocation Gap</div>
+            <div className={`text-3xl font-bold ${gapImproved ? 'text-emerald-600' : 'text-red-600'}`}>
+              {liveGap.toLocaleString()}
             </div>
             <div className="text-xs text-zinc-400 mt-1">
-              {rebalanced ? 'units optimised' : 'allocation gap across tracked SKU-store pairs'}
+              {rebalanced ? 'unmet demand after rebalance' : 'demand not met by current positioning'}
             </div>
           </div>
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 md:px-5 py-3 md:py-4">
             <div className="text-xs text-zinc-500 uppercase tracking-wide mb-1">AI Recommendations</div>
-            <div className="text-3xl font-bold text-amber-600">{affectedRows}</div>
+            <div className="text-3xl font-bold text-amber-600">{aiCount}</div>
             <div className="text-xs text-zinc-400 mt-1">store x SKU adjustments</div>
           </div>
         </div>
@@ -154,6 +246,9 @@ export default function AllocationPage() {
             <span className="text-xs text-zinc-400">
               {displayRows.length} of {rows.length} rows shown
             </span>
+            <button onClick={toggleSort} className="text-xs text-zinc-500 hover:text-zinc-800 transition-colors">
+              · sorted: {sortDir === 'worst' ? 'worst gap first' : 'surplus first'} {sortDir === 'worst' ? '▾' : '▴'}
+            </button>
             {selectedCount > 0 && (
               <span className="text-xs font-medium text-[#1a7a2e]">
                 {selectedCount} row{selectedCount > 1 ? 's' : ''} selected
@@ -172,7 +267,7 @@ export default function AllocationPage() {
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 applyDisabled
                   ? 'bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed'
-                  : 'bg-zinc-900 text-white hover:bg-zinc-700'
+                  : 'bg-[#1a7a2e] text-white hover:bg-[#156726]'
               }`}
             >
               {selectedCount === 0
@@ -203,7 +298,12 @@ export default function AllocationPage() {
                 <th className="text-right px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Demand</th>
                 <th className="text-right px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Current</th>
                 <th className="text-right px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">AI Recommended</th>
-                <th className="text-right px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Gap vs Demand</th>
+                <th
+                  onClick={toggleSort}
+                  className="text-right px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide cursor-pointer select-none hover:text-zinc-700"
+                >
+                  Gap vs Demand <span className="text-[#1a7a2e]">{sortDir === 'worst' ? '▾' : '▴'}</span>
+                </th>
                 <th className="text-center px-5 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">Status</th>
               </tr>
             </thead>
@@ -211,25 +311,22 @@ export default function AllocationPage() {
               {displayRows.map((row) => {
                 const key       = rowKey(row)
                 const store     = STORES.find(s => s.id === row.storeId)
-                const sku       = SKUS.find(s => s.id === row.skuId)
+                const sku       = product.skus.find(s => s.id === row.skuId)
                 const gap       = row.current - row.demand
                 const badge     = getGapBadge(gap)
                 const delta     = row.recommended - row.current
-                const isChanged = row.recommended !== ALLOCATION_TABLE.find(
-                  r => r.storeId === row.storeId && r.skuId === row.skuId
-                )?.current
                 const isSelected = selected.has(key)
 
                 return (
                   <tr
                     key={key}
-                    onClick={() => !rebalanced && toggleRow(key)}
+                    onClick={() => toggleRow(key)}
                     className="transition-colors cursor-pointer"
                     style={{
                       background: isSelected
                         ? 'rgba(26,122,46,0.06)'
-                        : row.rebalanced && isChanged
-                        ? 'rgba(220,252,231,0.6)'
+                        : row.rebalanced
+                        ? 'rgba(220,252,231,0.55)'
                         : getRowTint(gap)
                     }}
                   >
@@ -266,13 +363,13 @@ export default function AllocationPage() {
                     </td>
                     <td
                       className="px-5 py-3.5 text-right font-bold relative"
-                      style={{ color: getHeatTextColor(gap), background: getHeatBg(gap) }}
+                      style={{ color: getHeatTextColor(gap), background: getHeatBg(gap, maxGap) }}
                     >
                       {gap > 0 ? '+' : ''}{gap.toLocaleString()}
                       <div className="absolute bottom-0 left-0 right-0 h-[3px]">
                         <div className="h-full"
                              style={{
-                               width: getHeatBarWidth(gap),
+                               width: getHeatBarWidth(gap, maxGap),
                                background: getHeatBarColor(gap),
                                float: gap < 0 ? 'right' : 'left'
                              }} />
@@ -294,16 +391,13 @@ export default function AllocationPage() {
                   Total across all store x SKU combinations
                 </td>
                 <td className="px-5 py-3 text-right text-sm font-bold text-zinc-800">
-                  {rows.reduce((s, r) => s + r.current, 0).toLocaleString()}
+                  {currentTot.toLocaleString()}
                 </td>
                 <td className="px-5 py-3 text-right text-sm font-bold text-zinc-800">
-                  {rows.reduce((s, r) => s + r.recommended, 0).toLocaleString()}
+                  {recTot.toLocaleString()}
                 </td>
-                <td className={`px-5 py-3 text-right text-sm font-bold ${rebalanced ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {rebalanced
-                    ? `+${Math.abs(totalRebalanceGap)}`
-                    : totalCurrentGap > 0 ? `+${totalCurrentGap}` : totalCurrentGap
-                  }
+                <td className={`px-5 py-3 text-right text-sm font-bold ${gapImproved ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {liveGap > 0 ? '+' : ''}{liveGap.toLocaleString()}
                 </td>
                 <td />
               </tr>
@@ -330,6 +424,15 @@ export default function AllocationPage() {
             </div>
           </div>
         </div>
+
+        {/* Reconciliation footnote */}
+        <div className="bg-white border border-zinc-200 rounded-lg px-4 md:px-5 py-3 text-[11px] text-zinc-500 leading-relaxed">
+          <b className="text-zinc-700">How this reconciles:</b> Demand <b className="text-zinc-700">{demandTot.toLocaleString()}</b> = store-allocated demand (matches Products). Current <b className="text-zinc-700">{currentTot.toLocaleString()}</b> = units positioned in stores. <b className="text-zinc-700">Allocation Gap {liveGap.toLocaleString()}</b> = demand the current positioning doesn&rsquo;t cover — a positioning figure, distinct from the launch <b className="text-zinc-700">Supply Gap {product.unitsGap.toLocaleString()}</b> on Products &amp; Forecasting (procurement: pre-orders − committed).
+          {' '}
+          <b className="text-zinc-700">AI Recommended {recTot.toLocaleString()}</b> is the demand-optimal target mix, within total committed of {product.unitsCommitted.toLocaleString()}.{overText && <> Where a SKU&rsquo;s target runs ahead of committed stock — <b className="text-zinc-700">{overText}</b> — that gap is the mix-shift signal feeding Forecasting&rsquo;s <i>recommended additional buy</i>, not a repositioning of units already in hand.</>}
+        </div>
+        </>
+        )}
 
       </div>
     </div>

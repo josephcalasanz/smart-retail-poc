@@ -14,6 +14,7 @@ export type Product = {
   storeWeights: Record<string, number>
   skuDemand: Record<string, number>
   skuConfidence: Record<string, number>
+  skuCommitted: Record<string, number>
 }
 
 export const PRODUCTS: Product[] = [
@@ -45,6 +46,10 @@ export const PRODUCTS: Product[] = [
     skuConfidence: {
       'IPH17P-BLK-128': 84, 'IPH17P-WHT-128': 79,
       'IPH17P-NAT-256': 76, 'IPH17P-DST-256': 71,
+    },
+    skuCommitted: {
+      'IPH17P-BLK-128': 1210, 'IPH17P-WHT-128': 920,
+      'IPH17P-NAT-256': 710,  'IPH17P-DST-256': 620,
     },
     allocation: [
       { storeId: 'PH-GLO', skuId: 'IPH17P-BLK-128', current: 320, recommended: 480, demand: 510 },
@@ -88,6 +93,10 @@ export const PRODUCTS: Product[] = [
     skuConfidence: {
       'S25U-BLK-256': 79, 'S25U-SLV-256': 74,
       'S25U-BLU-512': 68, 'S25U-WHT-512': 65,
+    },
+    skuCommitted: {
+      'S25U-BLK-256': 980, 'S25U-SLV-256': 740,
+      'S25U-BLU-512': 520, 'S25U-WHT-512': 520,
     },
     allocation: [
       { storeId: 'PH-GLO', skuId: 'S25U-BLK-256', current: 240, recommended: 320, demand: 350 },
