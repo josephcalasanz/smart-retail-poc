@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import Header from '@/components/layout/Header'
 import {
-  demandSeries, salesSeries, mgmtStores, aging, stockouts, kpis,
+  demandSeries, mgmtStores, aging, stockouts, kpis, attentionItems,
 } from '@/lib/managementData'
 
 /* Reveal-on-scroll hook */
@@ -33,12 +34,11 @@ function useInView<T extends HTMLElement>() {
 
 const GROW = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
-function heatColor(t: number) {
-  const a = [234, 245, 236]
-  const b = [26, 122, 46]
-  const c = a.map((v, i) => Math.round(v + (b[i] - v) * t))
-  return `rgb(${c[0]}, ${c[1]}, ${c[2]})`
-}
+const ATTENTION_DOT = {
+  critical: '#ef4444',
+  review: '#f59e0b',
+  opportunity: '#22c55e',
+} as const
 
 const tooltipStyle = {
   contentStyle: {
@@ -70,11 +70,7 @@ function Card({ title, children }: { title: React.ReactNode; children: React.Rea
 export default function ManagementPage() {
   const [invRef, invInView] = useInView<HTMLDivElement>()
 
-  const heatVals = mgmtStores.flatMap((s) => [s.iphone, s.galaxy])
-  const vMin = Math.min(...heatVals)
-  const vMax = Math.max(...heatVals)
   const maxCover = Math.max(...mgmtStores.map((s) => s.daysCover))
-  const maxValue = Math.max(...mgmtStores.map((s) => s.invValue))
 
   const THRESHOLD = 14 // "healthy" days-of-cover cutoff
   const threshPct = (THRESHOLD / maxCover) * 100
@@ -90,7 +86,6 @@ export default function ManagementPage() {
     cum += a.pct
     return { ...a, seg, offset }
   })
-  
 
   return (
     <>
@@ -105,7 +100,51 @@ export default function ManagementPage() {
               <div key={k.label} className="flex-1 min-w-[150px] bg-white border border-zinc-200 rounded-xl px-4 py-3.5">
                 <div className="text-[9.5px] uppercase tracking-wide text-zinc-400">{k.label}</div>
                 <div className="text-2xl font-extrabold text-zinc-900 mt-0.5">{k.value}</div>
-                <div className="text-[10.5px] font-semibold mt-0.5" style={{ color: k.color }}>{k.delta}</div>
+                <div className="text-[10.5px] font-semibold mt-0.5" style={{ color: k.color }}>
+                  {k.delta}
+                  {k.sub && <span className="text-zinc-400 font-medium"> {k.sub}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Attention Required Today */}
+        <section>
+          <SectionLabel>Attention Required Today</SectionLabel>
+          <div className="flex flex-col gap-2.5">
+            {attentionItems.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center gap-3.5 bg-white border border-zinc-200 rounded-xl px-4 py-3.5"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ background: ATTENTION_DOT[a.severity] }}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-zinc-800">
+                    {a.title}
+                    {a.delta && (
+                      <span
+                        className={`ml-1.5 font-bold ${
+                          a.delta.dir === 'up' ? 'text-red-600' : 'text-blue-600'
+                        }`}
+                      >
+                        {a.delta.dir === 'up' ? '▲' : '▼'} {a.delta.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-0.5">{a.message}</div>
+                </div>
+                <Link
+                  href={a.href}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1a7a2e] hover:bg-[#156626]
+                             rounded-lg px-3.5 py-1.5 whitespace-nowrap transition-colors"
+                >
+                  {a.cta}
+                  <span className="text-[13px] opacity-80">→</span>
+                </Link>
               </div>
             ))}
           </div>
@@ -114,66 +153,24 @@ export default function ManagementPage() {
         {/* Demand Forecast */}
         <section>
           <SectionLabel>Demand Forecast</SectionLabel>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
-            <Card title="Forecast vs Actual">
-              <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={demandSeries} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={46} />
-                  <Tooltip {...tooltipStyle} />
-                  <Line name="Forecast" type="monotone" dataKey="forecast" stroke="#a1a1aa" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
-                  <Line name="Actual" type="monotone" dataKey="actual" stroke="#1a7a2e" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
-
-            <Card title="Sales Trend by SKU">
-              <ResponsiveContainer width="100%" height={150}>
-                <LineChart data={salesSeries} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
-                  <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={46} />
-                  <Tooltip {...tooltipStyle} />
-                  <Line name="iPhone 17 Pro" type="monotone" dataKey="iphone" stroke="#1a7a2e" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
-                  <Line name="Samsung S25 Ultra" type="monotone" dataKey="galaxy" stroke="#6ec6e6" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
-
-            <Card title="Store Demand Heatmap">
-              <div className="grid gap-1" style={{ gridTemplateColumns: '1fr auto auto' }}>
-                <div />
-                <div className="text-[8.5px] uppercase tracking-wide text-zinc-400 text-center px-1">iPhone</div>
-                <div className="text-[8.5px] uppercase tracking-wide text-zinc-400 text-center px-1">Samsung</div>
-                {mgmtStores.map((s) => {
-                  const tIp = (s.iphone - vMin) / (vMax - vMin)
-                  const tGa = (s.galaxy - vMin) / (vMax - vMin)
-                  const cell = (v: number, t: number) => (
-                    <div
-                      className="text-[11.5px] font-bold text-center rounded-md py-1.5 px-2 min-w-[44px]"
-                      style={{ background: heatColor(t), color: t > 0.55 ? '#fff' : '#1a7a2e' }}
-                    >
-                      {v}
-                    </div>
-                  )
-                  return (
-                    <div key={s.name} className="contents">
-                      <div className="text-[11px] text-zinc-600 self-center pr-2 whitespace-nowrap">{s.name}</div>
-                      {cell(s.iphone, tIp)}
-                      {cell(s.galaxy, tGa)}
-                    </div>
-                  )
-                })}
-              </div>
-            </Card>
-          </div>
+          <Card title="Forecast vs Actual">
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={demandSeries} margin={{ top: 8, right: 8, left: -4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#a1a1aa' }} axisLine={false} tickLine={false} width={46} />
+                <Tooltip {...tooltipStyle} />
+                <Line name="Forecast" type="monotone" dataKey="forecast" stroke="#a1a1aa" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
+                <Line name="Actual" type="monotone" dataKey="actual" stroke="#1a7a2e" strokeWidth={2} dot={false} isAnimationActive animationDuration={1800} animationEasing="ease-in-out" />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
         </section>
 
-{/* Inventory Health — reveal on scroll */}
+        {/* Inventory Health — reveal on scroll */}
         <section ref={invRef}>
           <SectionLabel>Inventory Health</SectionLabel>
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.1fr_1.1fr] gap-3.5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
             <Card title={<>Days of Cover by Store <span className="font-normal text-[9px] text-zinc-400 ml-1">| {THRESHOLD}d healthy</span></>}>
               {[...mgmtStores].sort((a, b) => a.daysCover - b.daysCover).map((s, i) => {
                 const col = s.daysCover < 7 ? '#ef4444' : s.daysCover < 14 ? '#f59e0b' : '#22c55e'
@@ -230,37 +227,6 @@ export default function ManagementPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            </Card>
-
-            <Card title="Inventory Value by Store (₱M)">
-              <div className="flex gap-1.5 items-end">
-                {mgmtStores.map((s, i) => (
-                  <div key={s.name} className="flex-1 flex flex-col items-center gap-1.5">
-                    <div className="text-[10px] font-bold text-zinc-800">{s.invValue}</div>
-                    <div className="w-[60%] h-[110px] flex items-end">
-                      <div
-                        className="w-full rounded-t"
-                        style={{
-                          height: `${(s.invValue / maxValue) * 100}%`,
-                          background: 'linear-gradient(180deg, #5ab22e, #1a7a2e)',
-                          transform: invInView ? 'scaleY(1)' : 'scaleY(0)',
-                          transformOrigin: 'bottom',
-                          transition: `transform 0.9s ${GROW}`,
-                          transitionDelay: `${i * 0.08}s`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="h-px bg-zinc-200" />
-              <div className="flex gap-1.5 mt-1">
-                {mgmtStores.map((s) => (
-                  <div key={s.name} className="flex-1 text-[8px] text-zinc-400 text-center leading-tight">
-                    {s.name.split(' ')[0]}
-                  </div>
-                ))}
               </div>
             </Card>
           </div>

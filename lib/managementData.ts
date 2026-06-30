@@ -58,10 +58,73 @@ export const stockouts = [
   { store: 'Robinsons Place', sku: 'iPhone 17 Pro',    risk: 'Medium', days: 9, color: '#f59e0b' },
 ]
 
-export const kpis = [
+export type Kpi = {
+  label: string
+  value: string
+  delta: string
+  sub?: string // muted context shown after the delta
+  color: string
+}
+
+// Potential Lost Sales (Today): unmet daily demand at the stockout-risk stores
+// (Glorietta, Greenhills, Ayala — see `stockouts`) priced at the matching SKU ASPs
+// from the store dataset (iPhone 17 Pro ₱79,990 · Samsung S25 Ultra ₱96,990).
+// ~13 units short across 3 stores ≈ ₱1.11M.
+export const kpis: Kpi[] = [
   { label: 'Inventory Value',   value: '₱58.4M',  delta: '▲ 3.2% wk',        color: '#16a34a' },
   { label: 'Weeks of Supply',   value: '4.2 wks', delta: '▼ 0.6 tightening', color: '#dc2626' },
   { label: 'Forecast Accuracy', value: '82.4%',   delta: '▲ 1.1%',           color: '#16a34a' },
   { label: 'Service Level',     value: '94.6%',   delta: '▼ 0.8%',           color: '#dc2626' },
   { label: 'Excess Inventory',  value: '₱6.4M',   delta: '11% of stock',     color: '#b45309' },
+  { label: 'Potential Lost Sales · Today', value: '₱1.11M', delta: '▲ vs yesterday', sub: '· 13 units · 3 stores', color: '#dc2626' },
+]
+
+// "Attention Required Today" feed — management-level signals derived from the
+// datasets above, each routing to the page where the user acts on it.
+export type AttentionItem = {
+  id: string
+  severity: 'critical' | 'review' | 'opportunity'
+  title: string
+  delta?: { label: string; dir: 'up' | 'down' }
+  message: string
+  cta: string
+  href: string
+}
+
+export const attentionItems: AttentionItem[] = [
+  {
+    id: 'lost-sales',
+    severity: 'critical',
+    title: 'Potential lost sales building',
+    delta: { label: 'vs yesterday', dir: 'up' },
+    message: '₱1.11M at risk today — 13 units short across Glorietta, Greenhills and Ayala. Reallocate inbound stock to recover.',
+    cta: 'Reallocate',
+    href: '/allocation',
+  },
+  {
+    id: 'service-level',
+    severity: 'review',
+    title: 'Service level below target',
+    delta: { label: '0.8%', dir: 'down' },
+    message: 'Now 94.6% as weeks of supply tighten to 4.2. Review the demand plan before it slips further.',
+    cta: 'View forecast',
+    href: '/forecasting',
+  },
+  {
+    id: 'excess-inventory',
+    severity: 'review',
+    title: 'Excess inventory rising',
+    message: '₱6.4M tied up — 11% of stock aged 60+ days, concentrated in lower-velocity stores. Review product mix.',
+    cta: 'View products',
+    href: '/products',
+  },
+  {
+    id: 'demand-outpacing',
+    severity: 'opportunity',
+    title: 'Demand outpacing forecast',
+    delta: { label: '8%', dir: 'up' },
+    message: 'Actual sell-through hit 6,050 vs 5,600 planned at week 8 — pull replenishment forward to capture it.',
+    cta: 'View forecast',
+    href: '/forecasting',
+  },
 ]
