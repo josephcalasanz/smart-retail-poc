@@ -9,6 +9,9 @@ import Header from '@/components/layout/Header'
 import {
   demandSeries, mgmtStores, aging, stockouts, kpis, attentionItems,
 } from '@/lib/managementData'
+import { purchaseRecs } from '@/lib/warehouseData'
+
+const pesoM = (n: number) => `₱${(n / 1e6).toFixed(1)}M`
 
 /* Reveal-on-scroll hook */
 function useInView<T extends HTMLElement>() {
@@ -70,6 +73,9 @@ function Card({ title, children }: { title: React.ReactNode; children: React.Rea
 export default function ManagementPage() {
   const [invRef, invInView] = useInView<HTMLDivElement>()
 
+  const purchaseUnits = purchaseRecs.reduce((a, r) => a + r.qty, 0)
+  const purchaseValue = purchaseRecs.reduce((a, r) => a + r.qty * r.price, 0)
+
   const maxCover = Math.max(...mgmtStores.map((s) => s.daysCover))
 
   const THRESHOLD = 14 // "healthy" days-of-cover cutoff
@@ -109,44 +115,81 @@ export default function ManagementPage() {
           </div>
         </section>
 
-        {/* Attention Required Today */}
+        {/* Attention Required Today + Purchase Recommendations */}
         <section>
-          <SectionLabel>Attention Required Today</SectionLabel>
-          <div className="flex flex-col gap-2.5">
-            {attentionItems.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center gap-3.5 bg-white border border-zinc-200 rounded-xl px-4 py-3.5"
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ background: ATTENTION_DOT[a.severity] }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-zinc-800">
-                    {a.title}
-                    {a.delta && (
-                      <span
-                        className={`ml-1.5 font-bold ${
-                          a.delta.dir === 'up' ? 'text-red-600' : 'text-blue-600'
-                        }`}
-                      >
-                        {a.delta.dir === 'up' ? '▲' : '▼'} {a.delta.label}
-                      </span>
-                    )}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-4 items-stretch">
+            {/* Attention */}
+            <div className="flex flex-col">
+              <SectionLabel>Attention Required Today</SectionLabel>
+              <div className="flex flex-col gap-2.5 flex-1 justify-between">
+                {attentionItems.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center gap-3.5 bg-white border border-zinc-200 rounded-xl px-4 py-3.5"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ background: ATTENTION_DOT[a.severity] }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-zinc-800">
+                        {a.title}
+                        {a.delta && (
+                          <span
+                            className={`ml-1.5 font-bold ${
+                              a.delta.dir === 'up' ? 'text-red-600' : 'text-blue-600'
+                            }`}
+                          >
+                            {a.delta.dir === 'up' ? '▲' : '▼'} {a.delta.label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-0.5">{a.message}</div>
+                    </div>
+                    <Link
+                      href={a.href}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1a7a2e] hover:bg-[#156626]
+                                 rounded-lg px-3.5 py-1.5 whitespace-nowrap transition-colors"
+                    >
+                      {a.cta}
+                      <span className="text-[13px] opacity-80">→</span>
+                    </Link>
                   </div>
-                  <div className="text-xs text-zinc-500 mt-0.5">{a.message}</div>
-                </div>
-                <Link
-                  href={a.href}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-white bg-[#1a7a2e] hover:bg-[#156626]
-                             rounded-lg px-3.5 py-1.5 whitespace-nowrap transition-colors"
-                >
-                  {a.cta}
-                  <span className="text-[13px] opacity-80">→</span>
-                </Link>
+                ))}
               </div>
-            ))}
+            </div>
+
+            {/* Purchase Recommendations */}
+            <div className="flex flex-col">
+              <SectionLabel>Purchase Recommendations</SectionLabel>
+              <div className="bg-white border border-zinc-200 rounded-xl p-4 flex-1 flex flex-col">
+                <div className="text-xs text-zinc-500 leading-relaxed mb-3">
+                  Recommended purchase commitment sized from demand forecasts, warehouse inventory, supplier lead times, and safety-stock targets.
+                </div>
+                <div className="flex items-baseline justify-between pb-3 border-b border-zinc-100">
+                  <div>
+                    <div className="text-2xl font-extrabold text-zinc-900 leading-none">{purchaseUnits.toLocaleString()}</div>
+                    <div className="text-[10px] text-zinc-400 mt-1">units · {purchaseRecs.length} SKUs</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-base font-bold text-zinc-800">{pesoM(purchaseValue)}</div>
+                    <div className="text-[10px] text-zinc-400 mt-1">est. commitment</div>
+                  </div>
+                </div>
+                <div className="flex flex-col justify-around flex-1">
+                  {purchaseRecs.map((r) => (
+                    <div key={r.sv + r.prod} className="flex items-center gap-2.5 py-2 border-t border-zinc-50 first:border-t-0">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-zinc-800">{r.sv}</div>
+                        <div className="text-[11px] text-zinc-400">{r.prod}</div>
+                      </div>
+                      <div className="text-[13px] font-bold text-[#16a34a]">+{r.qty}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

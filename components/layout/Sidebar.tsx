@@ -4,13 +4,14 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, TrendingUp, BarChart2, MessageSquare, User, HelpCircle, Moon, LogOut, ChevronUp, ChevronDown, ChevronRight, Menu, Gauge, Users, Store } from 'lucide-react'
+import { LayoutDashboard, TrendingUp, BarChart2, MessageSquare, User, HelpCircle, Moon, LogOut, ChevronUp, ChevronDown, ChevronRight, Menu, Gauge, Users, Store, Warehouse } from 'lucide-react'
 const DASHBOARD = {
   href: '/dashboard',
   label: 'Dashboard',
   icon: Gauge,
   children: [
     { href: '/dashboard/management', label: 'Management', icon: Users },
+    { href: '/dashboard/warehouse',  label: 'Warehouse',  icon: Warehouse },
     { href: '/dashboard/store',      label: 'Store',      icon: Store },
   ],
 }
