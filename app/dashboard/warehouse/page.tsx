@@ -143,13 +143,13 @@ export default function WarehousePage() {
         <section>
           <SectionLabel>Purchase Recommendations</SectionLabel>
           <div className="bg-white border border-zinc-200 rounded-xl p-4">
-            <div className="flex items-start justify-between gap-4 mb-1">
-              <div className="text-xs text-zinc-500 max-w-[68%] leading-relaxed">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-1">
+              <div className="text-xs text-zinc-500 sm:max-w-[68%] leading-relaxed">
                 Recommended items and quantities to order today, from demand forecasts, inventory levels, supplier lead times, and safety stock.
               </div>
               <button
                 onClick={() => setModalOpen(true)}
-                className="rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap bg-[#1a7a2e] text-white hover:bg-[#156626] transition-colors"
+                className="w-full sm:w-auto rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap bg-[#1a7a2e] text-white hover:bg-[#156626] transition-colors"
               >
                 Purchase Now
               </button>
@@ -167,7 +167,7 @@ export default function WarehousePage() {
                 </div>
               </div>
             ))}
-            <div className="flex justify-between pt-3 border-t border-zinc-200 mt-1 text-xs text-zinc-500">
+            <div className="flex flex-col gap-1 sm:flex-row sm:justify-between pt-3 border-t border-zinc-200 mt-1 text-xs text-zinc-500">
               <span>{purchaseRecs.length} SKUs recommended · closes the launch supply gap</span>
               <span><b className="text-zinc-700">{purchaseUnits.toLocaleString()} units</b> · est. {pesoM(purchaseValue)}</span>
             </div>
@@ -178,13 +178,13 @@ export default function WarehousePage() {
         <section>
           <SectionLabel>Store Replenishment Recommendations</SectionLabel>
           <div className="bg-white border border-zinc-200 rounded-xl p-4">
-            <div className="flex items-start justify-between gap-4 mb-1">
-              <div className="text-xs text-zinc-500 max-w-[68%] leading-relaxed">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 mb-1">
+              <div className="text-xs text-zinc-500 sm:max-w-[68%] leading-relaxed">
                 Recommended replenishment quantities for each store, from projected sales, current inventory, and transfer availability.
               </div>
               <Link
                 href="/allocation"
-                className="rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap bg-[#1a7a2e] text-white hover:bg-[#156626] transition-colors"
+                className="w-full sm:w-auto text-center rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap bg-[#1a7a2e] text-white hover:bg-[#156626] transition-colors"
               >
                 Open Allocation →
               </Link>
@@ -199,7 +199,7 @@ export default function WarehousePage() {
                 <div className="text-[13px] font-bold text-[#16a34a]">+{x.qty}</div>
               </div>
             ))}
-            <div className="flex justify-between pt-3 border-t border-zinc-200 mt-1 text-xs text-zinc-500">
+            <div className="flex flex-col gap-1 sm:flex-row sm:justify-between pt-3 border-t border-zinc-200 mt-1 text-xs text-zinc-500">
               <span>{replenishment.length} stores flagged · sourced from DC available stock</span>
               <span><b className="text-zinc-700">{replenishTot.toLocaleString()} units</b> to dispatch</span>
             </div>

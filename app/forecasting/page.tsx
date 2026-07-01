@@ -217,7 +217,8 @@ export default function ForecastingPage() {
             <div className="bg-white border border-zinc-200 rounded-lg">
               <div className="px-5 pt-4"><div className="text-sm font-semibold text-zinc-800">Where shortages hit · forecast vs committed by SKU</div><div className="text-xs text-zinc-400 mt-0.5">Negative = under-committed against forecast demand.</div></div>
               <div className="px-5 py-3">
-                <table className="w-full border-collapse">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[440px] border-collapse">
                   <thead><tr>{['SKU', 'Forecast', 'Committed', 'Gap', 'Status'].map((h) => <th key={h} className="text-[10px] uppercase tracking-wide text-zinc-400 text-left font-bold pb-1.5 px-2">{h}</th>)}</tr></thead>
                   <tbody>
                     {centralRows.map((r) => (
@@ -231,6 +232,7 @@ export default function ForecastingPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
               <div className="px-5 py-3 text-[11px] text-zinc-500 border-t border-zinc-100 leading-relaxed">
                 <b className="text-zinc-700">How this reconciles:</b> Supply Gap {product.unitsGap.toLocaleString()} = pre-orders {product.preOrders.toLocaleString()} − committed {committed.toLocaleString()} (same figure as Products). Committed {committed.toLocaleString()} = {onHand.toLocaleString()} positioned in stores + {awaiting.toLocaleString()} awaiting positioning. Central adds the buy decision, not a new number.

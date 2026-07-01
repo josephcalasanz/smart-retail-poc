@@ -241,7 +241,7 @@ export default function Sidebar() {
       {/* Mobile hamburger */}
       <button
         onClick={() => setOpen(true)}
-        className="md:hidden fixed top-3 left-3 z-50 bg-zinc-900 text-white p-2 rounded-md shadow-lg"
+        className="md:hidden fixed top-3 left-3 z-[60] bg-zinc-900 text-white p-2 rounded-md shadow-lg"
         aria-label="Open menu"
       >
         <Menu size={18} />
@@ -249,12 +249,12 @@ export default function Sidebar() {
 
       {/* Mobile overlay */}
       {open && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setOpen(false)} />
+        <div className="md:hidden fixed inset-0 z-[55] bg-black/50" onClick={() => setOpen(false)} />
       )}
 
       {/* Mobile drawer */}
       <aside
-        className={`md:hidden fixed left-0 top-0 h-screen w-56 bg-zinc-900 border-r border-zinc-800 flex flex-col z-50 overflow-visible transition-transform duration-300 ${
+        className={`md:hidden fixed left-0 top-0 h-screen w-56 bg-zinc-900 border-r border-zinc-800 flex flex-col z-[60] overflow-visible transition-transform duration-300 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

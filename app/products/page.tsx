@@ -264,7 +264,8 @@ export default function ProductsPage() {
                 </div>
                 <div className="py-3 border-t border-zinc-50">
                   <div className="text-sm font-bold text-zinc-800 mb-2">By store</div>
-                  <table className="w-full border-collapse">
+                  <div className="overflow-x-auto">
+                  <table className="w-full min-w-[440px] border-collapse">
                     <thead>
                       <tr>{['Store', 'On hand', 'Demand', 'Gap', 'Cov', 'Status'].map(h => (
                         <th key={h} className="text-[9px] uppercase tracking-wide text-zinc-400 text-left font-bold pb-1.5 px-1.5">{h}</th>
@@ -283,6 +284,7 @@ export default function ProductsPage() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </>
             )}
